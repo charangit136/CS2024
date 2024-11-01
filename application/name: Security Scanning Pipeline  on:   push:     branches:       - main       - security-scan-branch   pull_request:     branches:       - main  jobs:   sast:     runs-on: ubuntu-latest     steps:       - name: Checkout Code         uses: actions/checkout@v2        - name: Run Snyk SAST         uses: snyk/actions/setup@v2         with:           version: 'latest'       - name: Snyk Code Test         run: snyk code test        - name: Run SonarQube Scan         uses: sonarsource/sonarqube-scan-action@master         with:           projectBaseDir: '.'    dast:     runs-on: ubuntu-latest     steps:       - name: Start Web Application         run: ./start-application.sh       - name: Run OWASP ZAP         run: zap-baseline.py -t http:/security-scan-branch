@@ -1,0 +1,43 @@
+name: Security Scanning Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - security-scan-branch
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  sast:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Run Snyk SAST
+        uses: snyk/actions/setup@v2
+        with:
+          version: 'latest'
+      - name: Snyk Code Test
+        run: snyk code test
+
+      - name: Run SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@master
+        with:
+          projectBaseDir: '.'
+
+  dast:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start Web Application
+        run: ./start-application.sh
+      - name: Run OWASP ZAP
+        run: zap-baseline.py -t http://localhost:8000 -r zap_report.html
+
+  sca:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Dependency-Check
+        run: dependency-check --out .
