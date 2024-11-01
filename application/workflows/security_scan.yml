@@ -1,0 +1,69 @@
+name: Security Scanning Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - security-scan-branch
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  sast:
+    name: Static Application Security Testing (SAST) with SonarQube
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up SonarQube
+        uses: sonarsource/sonarqube-scan-action@v1
+        with:
+          projectBaseDir: '.'
+          args: >
+            -Dsonar.projectKey=CS2024
+            -Dsonar.host.url=${{ secrets.SONARQUBE_URL }}
+            -Dsonar.login=${{ secrets.SONARQUBE_TOKEN }}
+
+      - name: Run SonarScanner
+        run: sonar-scanner
+
+  dast:
+    name: Dynamic Application Security Testing (DAST) with OWASP ZAP
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Start the application
+        run: ./start-application.sh # Start the application locally on a specified port
+
+      - name: Run OWASP ZAP Scan
+        uses: zapbot/zap-action@v0.1.1
+        with:
+          target: 'http://localhost:3000' # Target URL for the application
+          cmd_options: '-t 60 -r zap_report.html'
+          
+      - name: Upload OWASP ZAP report
+        uses: actions/upload-artifact@v2
+        with:
+          name: zap_report
+          path: zap_report.html
+
+  sca:
+    name: Software Composition Analysis (SCA) with OWASP Dependency-Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Run OWASP Dependency-Check
+        run: |
+          dependency-check.sh --project "CS2024" --scan . --out ./dependency-check-report
+
+      - name: Upload Dependency-Check report
+        uses: actions/upload-artifact@v2
+        with:
+          name: dependency-check-report
+          path: ./dependency-check-report
